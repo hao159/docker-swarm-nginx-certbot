@@ -1,0 +1,47 @@
+version: '3.7'
+
+services:
+  nginx:
+    image: hub.haonguyen96.net/nginx:latest
+    ports:
+      - target: 80
+        published: 80
+        protocol: tcp
+        mode: host
+      - target: 443
+        published: 443
+        protocol: tcp
+        mode: host
+    volumes:
+      - ./conf.d:/etc/nginx/conf.d
+      - ./ssl:/etc/nginx/ssl
+      - ./www:/var/www/certbot
+    deploy:
+      mode: replicated
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      update_config:
+        parallelism: 1
+        delay: 10s
+    networks:
+      - proxy-network
+
+  certbot:
+    image: certbot/certbot:latest
+    volumes:
+      - ./ssl:/etc/letsencrypt
+      - ./www:/var/www/certbot
+    entrypoint: /bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'
+    deploy:
+      mode: replicated
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    networks:
+      - proxy-network
+
+networks:
+  proxy-network:
+    driver: overlay
+    attachable: true
